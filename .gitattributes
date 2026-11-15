@@ -1,0 +1,6 @@
+# Count the example email templates as HTML in GitHub's language bar
+# (GitHub skips "examples/" as documentation by default).
+examples/** linguist-documentation=false
+*.html linguist-detectable=true
+*.css linguist-detectable=true
+*.gs linguist-language=JavaScript

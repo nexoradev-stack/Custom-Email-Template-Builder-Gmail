@@ -187,6 +187,7 @@ In the add-on, change `APP_NAME`, `BLUE` and `BLUE_DARK` at the top of `Code.gs`
 │   │   ├── builder.client.js   Build with blocks
 │   │   ├── htmledit.client.js  Paste HTML: edit in preview, rows, undo
 │   │   ├── customisePage.js    what users see when customising
+│   │   ├── styles/         editor, customise, preview and upload CSS
 │   │   └── …
 │   ├── assets/             icon, logo and placeholders
 │   ├── test/               node:test unit tests

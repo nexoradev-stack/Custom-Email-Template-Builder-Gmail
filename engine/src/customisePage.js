@@ -1,5 +1,7 @@
 'use strict';
 
+const customiseCss = require('fs').readFileSync(require('path').join(__dirname, 'styles', 'customise.css'), 'utf8');
+
 /**
  * Customise window for users: change the photos and text the admin allowed,
  * block by block, without breaking the layout. Photos are cut to the exact
@@ -19,58 +21,7 @@ function customisePage({ ticket, name, category, html, blocks, locks }) {
 <title>Customise · ${String(name).replace(/[<>&"]/g, '')} · __APP__</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
-  html{color-scheme:light}
-  *{box-sizing:border-box}
-  body{margin:0;background:__PAGE__;font-family:Inter,Arial,sans-serif;color:__INK__;height:100vh;display:flex;flex-direction:column;overflow:hidden}
-  .band{margin:12px 12px 0;background:__INK__;border-radius:16px;padding:12px 16px;display:grid;grid-template-columns:38px minmax(0,1fr) 38px;align-items:center;gap:12px;flex-shrink:0}
-  .logo{width:38px;height:38px;border-radius:10px;background:__PAGE__;color:__INK__;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px}
-  .logo img{width:26px;height:auto;display:block}
-  .band h1{margin:0;font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:15px;letter-spacing:1.6px;color:__PAGE__;text-align:center}
-  .bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 16px;flex-shrink:0}
-  .nm{font-size:16px;font-weight:600}
-  .meta{font-size:12px;color:#5F6368}
-  .grow{flex:1}
-  .btn{height:38px;padding:0 18px;border-radius:19px;border:1px solid #747775;background:#fff;color:__ACCENT_DARK__;font:inherit;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
-  .btn.fill{background:__ACCENT__;border-color:__ACCENT__;color:#fff}
-  .btn.sm{height:32px;font-size:13px;padding:0 14px}
-  .btn:disabled{opacity:.5;cursor:default}
-  .btn:focus-visible,.seg button:focus-visible{outline:3px solid __ACCENT__;outline-offset:2px}
-  .main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;padding:0 12px 12px;min-height:0}
-  .stage{background:#F1F3F4;border-radius:12px;min-height:0;overflow:hidden;display:flex}
-  iframe{border:0;width:100%;height:100%;background:#F1F3F4}
-  .side{background:#fff;border:1px solid #DEDDD8;border-radius:12px;padding:16px;overflow:auto;min-height:0}
-  .side h2{margin:0 0 4px;font-size:12px;letter-spacing:.6px;color:#5F6368;font-weight:600}
-  .big{font-size:15px;font-weight:600;margin-bottom:8px}
-  .side p{font-size:13px;line-height:1.5;color:#3C4043;margin:0 0 12px}
-  .seg{display:flex;border:1px solid #C9CCD1;border-radius:8px;overflow:hidden;margin-bottom:12px}
-  .seg button{flex:1;height:32px;border:0;border-left:1px solid #E3E2DE;background:#fff;font:inherit;font-size:12.5px;cursor:pointer;color:#3C4043}
-  .seg button:first-child{border-left:0}
-  .seg button[aria-pressed="true"]{background:__ACCENT_TINT__;color:__ACCENT_DARK__;font-weight:600}
-  .stack{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
-  .fmt{display:flex;flex-wrap:wrap;gap:6px}
-  .fmtb{height:30px;padding:0 10px;font-size:12.5px;border-radius:8px}
-  .fmt-bold{font-weight:700}.fmt-italic{font-style:italic}.fmt-underline{text-decoration:underline}
-  .linkrow{display:flex;gap:6px}
-  .linkrow input{flex:1;min-width:0;height:32px;border:1px solid #C9CCD1;border-radius:8px;padding:0 9px;font:inherit;font-size:12.5px}
-  .linkrow .btn{height:32px;font-size:12.5px;padding:0 12px}
-  .line{height:1px;background:#EEEDEA;margin:16px 0}
-  .list button{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px;padding:8px 6px;border:0;border-bottom:1px solid #F1F3F4;background:none;font:inherit;font-size:13px;text-align:left;cursor:pointer;color:__INK__;border-radius:6px}
-  .list button:hover{background:__ACCENT_WASH__}
-  .list button:disabled{cursor:default;color:#80868B}
-  .list button:disabled:hover{background:none}
-  .list em{font-style:normal;font-size:11.5px;color:#5F6368;white-space:nowrap}
-  .list em.ch{color:#137333;font-weight:600}
-  .list span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .msg{font-size:13px;line-height:1.45;border-radius:8px;padding:10px 12px;margin-bottom:12px}
-  .msg.ok{background:#E6F4EA;color:#0D652D}
-  .msg.err{background:#FCE8E6;color:#A50E0E}
-  .msg.info{background:#F1F3F4;color:#3C4043}
-  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-  .done{position:fixed;inset:0;background:rgba(4,10,27,.55);display:none;align-items:center;justify-content:center;padding:20px}
-  .done .box{background:#fff;border-radius:16px;padding:24px;max-width:420px;text-align:center}
-  .done h3{margin:0 0 8px;font-size:18px}
-  .done p{margin:0 0 16px;font-size:14px;line-height:1.5;color:#3C4043}
-  @media (max-width:860px){.main{grid-template-columns:1fr;grid-template-rows:1fr auto}.side{max-height:40vh}}
+${customiseCss}
 </style>
 </head>
 <body>
