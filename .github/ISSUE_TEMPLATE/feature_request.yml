@@ -1,0 +1,22 @@
+name: ✨ Feature request
+description: Suggest an idea
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+  - type: dropdown
+    id: who
+    attributes:
+      label: Who is it for?
+      options:
+        - Admins
+        - Everyone
+        - People setting it up

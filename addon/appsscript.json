@@ -1,0 +1,43 @@
+{
+  "timeZone": "Etc/UTC",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/gmail.addons.current.action.compose",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/cloud-identity.groups.readonly"
+  ],
+  "urlFetchWhitelist": [
+    "https://YOUR-ENGINE-URL.a.run.app/"
+  ],
+  "addOns": {
+    "common": {
+      "name": "Template Gallery",
+      "logoUrl": "https://YOUR-ENGINE-URL.a.run.app/assets/icon.png",
+      "layoutProperties": {
+        "primaryColor": "#17123B",
+        "secondaryColor": "#6C3BFF"
+      },
+      "openLinkUrlPrefixes": [
+        "https://YOUR-ENGINE-URL.a.run.app/"
+      ],
+      "homepageTrigger": {
+        "runFunction": "onHomepage",
+        "enabled": true
+      }
+    },
+    "gmail": {
+      "composeTrigger": {
+        "selectActions": [
+          {
+            "text": "Template Gallery",
+            "runFunction": "onCompose"
+          }
+        ],
+        "draftAccess": "NONE"
+      }
+    }
+  }
+}
