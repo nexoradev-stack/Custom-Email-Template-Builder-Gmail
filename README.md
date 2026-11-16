@@ -23,6 +23,7 @@
   <a href="#-how-it-works">How it works</a> ·
   <a href="#-quick-start">Quick start</a> ·
   <a href="#-make-it-yours">Make it yours</a> ·
+  <a href="#-what-it-costs">Costs</a> ·
   <a href="#-credits">Credits</a>
 </p>
 
@@ -166,6 +167,20 @@ Your brand lives in settings, not in the code. Set these in `engine/env.yaml`:
 | `BRAND_PAGE` | Page background | ![#F8F7FC](https://img.shields.io/badge/-%23F8F7FC-F8F7FC?style=flat-square) |
 
 In the add-on, change `APP_NAME`, `BLUE` and `BLUE_DARK` at the top of `Code.gs`, and the name, colours and icon in `appsscript.json`. Details in [docs/setup.md](docs/setup.md#7-make-it-yours).
+
+---
+
+## 💰 What it costs
+
+**No AI, no API keys, no tokens.** It runs on your own Google Cloud project, on services with free monthly allowances.
+
+| | 🟢 50 people | 🔵 500 people | 🟣 5,000 people |
+|---|---|---|---|
+| **Per week** | ≈ $0.05 | ≈ $0.15 | ≈ $1.20 |
+| **Per month** | ≈ $0.22 | ≈ $0.65 | ≈ $5.15 |
+| **Per year** | ≈ $2.60 | ≈ $7.80 | ≈ $62 |
+
+Most of the cost is pictures loaded when people open your emails. See the full breakdown, a 2-minute way to calculate your own cost, and tips to keep it near $0 in **[docs/costs.md](docs/costs.md)**.
 
 ---
 

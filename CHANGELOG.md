@@ -1,5 +1,9 @@
 # 📝 Changelog
 
+## Unreleased
+- Docs: what it costs to run (no AI or API keys needed), with weekly, monthly and yearly examples and a simple way to calculate your own cost
+- Engine: page styles moved into CSS files
+
 ## 1.0.0 — November 2026
 First public release.
 
