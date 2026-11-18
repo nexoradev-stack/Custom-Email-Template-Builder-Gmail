@@ -11,7 +11,7 @@ const at = { toDate: () => new Date() };
 test('a draft shared with Alex is only for Alex', () => {
   const d = { status: 'draft', sharedWith: ['alex@acme-corp.io'], sharedAt: at, sharedHtml: '<p>for the CEO</p>', draftHtml: '<p>newer</p>' };
   assert.strictEqual(accessFor(d, alex), 'shared');
-  assert.strictEqual(accessFor({ ...d }, { email: 'ANKITA@acme-corp.io' }), 'shared');
+  assert.strictEqual(accessFor({ ...d }, { email: 'ALEX@acme-corp.io' }), 'shared');
   assert.strictEqual(accessFor(d, other), null);
   assert.strictEqual(usableHtml(d, 'shared'), '<p>for the CEO</p>', 'she gets the fixed copy, not the newer draft');
 });
@@ -35,7 +35,7 @@ test('a list without a shared copy gives no access', () => {
 
 test('share list: only company addresses, no repeats, a limit', () => {
   assert.deepStrictEqual(cleanShareList([' Alex@acme-corp.io ', 'alex@acme-corp.io', ''], 'acme-corp.io', 25), ['alex@acme-corp.io']);
-  assert.throws(() => cleanShareList(['ben@gmail.com'], 'acme-corp.io', 25), /Only acme-corp.io addresses/);
+  assert.throws(() => cleanShareList(['sam@gmail.com'], 'acme-corp.io', 25), /Only acme-corp.io addresses/);
   assert.throws(() => cleanShareList(['not an email'], 'acme-corp.io', 25), /not an email address/);
   assert.throws(() => cleanShareList(['a@acme-corp.io.evil.io'], 'acme-corp.io', 25), /Only acme-corp.io/);
   const many = Array.from({ length: 26 }, (v, i) => `p${i}@acme-corp.io`);
