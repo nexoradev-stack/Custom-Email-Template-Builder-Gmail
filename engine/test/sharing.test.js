@@ -4,37 +4,37 @@ const assert = require('node:assert');
 const { accessFor, sharedList, usableHtml, cleanShareList } = require('../src/sharing');
 const { processTemplate } = require('../src/pipeline');
 
-const ankita = { email: 'ankita@acme-corp.io' };
+const alex = { email: 'alex@acme-corp.io' };
 const other = { email: 'someone@acme-corp.io' };
 const at = { toDate: () => new Date() };
 
-test('a draft shared with Ankita is only for Ankita', () => {
-  const d = { status: 'draft', sharedWith: ['ankita@acme-corp.io'], sharedAt: at, sharedHtml: '<p>for Ben</p>', draftHtml: '<p>newer</p>' };
-  assert.strictEqual(accessFor(d, ankita), 'shared');
+test('a draft shared with Alex is only for Alex', () => {
+  const d = { status: 'draft', sharedWith: ['alex@acme-corp.io'], sharedAt: at, sharedHtml: '<p>for the CEO</p>', draftHtml: '<p>newer</p>' };
+  assert.strictEqual(accessFor(d, alex), 'shared');
   assert.strictEqual(accessFor({ ...d }, { email: 'ANKITA@acme-corp.io' }), 'shared');
   assert.strictEqual(accessFor(d, other), null);
-  assert.strictEqual(usableHtml(d, 'shared'), '<p>for Ben</p>', 'she gets the fixed copy, not the newer draft');
+  assert.strictEqual(usableHtml(d, 'shared'), '<p>for the CEO</p>', 'she gets the fixed copy, not the newer draft');
 });
 
 test('a plain draft is for nobody; a published template is for everyone', () => {
-  assert.strictEqual(accessFor({ status: 'draft' }, ankita), null);
-  assert.strictEqual(accessFor({ status: 'unpublished', publishedHtml: '<p>x</p>' }, ankita), null);
+  assert.strictEqual(accessFor({ status: 'draft' }, alex), null);
+  assert.strictEqual(accessFor({ status: 'unpublished', publishedHtml: '<p>x</p>' }, alex), null);
   assert.strictEqual(accessFor({ status: 'published', publishedHtml: '<p>x</p>' }, other), 'published');
 });
 
 test('once published, the named list no longer matters', () => {
-  const d = { status: 'published', publishedHtml: '<p>all</p>', sharedWith: ['ankita@acme-corp.io'], sharedAt: at, sharedHtml: '<p>old</p>' };
+  const d = { status: 'published', publishedHtml: '<p>all</p>', sharedWith: ['alex@acme-corp.io'], sharedAt: at, sharedHtml: '<p>old</p>' };
   assert.deepStrictEqual(sharedList(d), []);
-  assert.strictEqual(accessFor(d, ankita), 'published');
+  assert.strictEqual(accessFor(d, alex), 'published');
   assert.strictEqual(usableHtml(d, 'published'), '<p>all</p>');
 });
 
 test('a list without a shared copy gives no access', () => {
-  assert.strictEqual(accessFor({ status: 'draft', sharedWith: ['ankita@acme-corp.io'] }, ankita), null);
+  assert.strictEqual(accessFor({ status: 'draft', sharedWith: ['alex@acme-corp.io'] }, alex), null);
 });
 
 test('share list: only company addresses, no repeats, a limit', () => {
-  assert.deepStrictEqual(cleanShareList([' Ankita@acme-corp.io ', 'ankita@acme-corp.io', ''], 'acme-corp.io', 25), ['ankita@acme-corp.io']);
+  assert.deepStrictEqual(cleanShareList([' Alex@acme-corp.io ', 'alex@acme-corp.io', ''], 'acme-corp.io', 25), ['alex@acme-corp.io']);
   assert.throws(() => cleanShareList(['ben@gmail.com'], 'acme-corp.io', 25), /Only acme-corp.io addresses/);
   assert.throws(() => cleanShareList(['not an email'], 'acme-corp.io', 25), /not an email address/);
   assert.throws(() => cleanShareList(['a@acme-corp.io.evil.io'], 'acme-corp.io', 25), /Only acme-corp.io/);
