@@ -21,7 +21,8 @@
         "secondaryColor": "#6C3BFF"
       },
       "openLinkUrlPrefixes": [
-        "https://YOUR-ENGINE-URL.a.run.app/"
+        "https://YOUR-ENGINE-URL.a.run.app/",
+        "https://storage.googleapis.com/YOUR-IMAGE-BUCKET/"
       ],
       "homepageTrigger": {
         "runFunction": "onHomepage",

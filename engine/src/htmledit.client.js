@@ -805,7 +805,7 @@
     if (!inLib && !isPlaceholder && /^https:\/\//i.test(src)) {
       l1.appendChild(btn('Copy into library', 'b fill', function (e, b) { copyIntoLibrary(img, b); }, 'Copy this picture into your image library'));
     }
-    l1.appendChild(btn('Upload', 'b' + (inLib || isPlaceholder ? ' fill' : ''), function () { pickFile(img, w); }));
+    l1.appendChild(btn('Upload', 'b' + (inLib || isPlaceholder ? ' fill' : ''), function () { pickFile(img, w, bar, l1); }));
     l1.appendChild(btn('From library', 'b', function () { library(bar, img, w); }));
     var link = el('input');
     link.type = 'text';
@@ -820,6 +820,11 @@
       setSrc(img, v, 'Image link');
     }));
     bar.appendChild(l1);
+    if (window.IMGLIMIT) {
+      var lh = el('div', 'line');
+      lh.appendChild(window.IMGLIMIT.hint());
+      bar.appendChild(lh);
+    }
 
     var l2 = el('div', 'line wrap');
     l2.appendChild(el('span', 'lab', 'HEIGHT'));
@@ -918,7 +923,11 @@
     }).catch(function (e) {
       button.disabled = false;
       button.textContent = 'Copy into library';
-      ED.toast(e.message, true);
+      var bar = button.closest('.tb');
+      if (e.data && e.data.tooBig && window.IMGLIMIT && bar) {
+        window.IMGLIMIT.show(bar, e.data.size || 0, button.closest('.line'), 'Download the picture, reduce it, then click Upload here.');
+        place();
+      } else ED.toast(e.message, true);
     });
   }
 
@@ -929,7 +938,7 @@
   document.body.appendChild(fileInput);
   var pending = null;
 
-  function pickFile(img, w) { pending = { img: img, w: w }; fileInput.click(); }
+  function pickFile(img, w, bar, line) { pending = { img: img, w: w, bar: bar, line: line }; fileInput.click(); }
 
   fileInput.addEventListener('change', function () {
     var f = fileInput.files[0];
@@ -937,7 +946,12 @@
     if (!f || !pending) return;
     var t = pending;
     pending = null;
-    if (f.size > 10 * 1024 * 1024) { ED.toast('That image is over 10 MB. Make it smaller and try again.', true); return; }
+    if (window.IMGLIMIT && t.bar) window.IMGLIMIT.clear(t.bar);
+    if (f.size > ED.maxImage) {
+      if (window.IMGLIMIT && t.bar && t.bar.isConnected) { window.IMGLIMIT.show(t.bar, f.size, t.line); place(); }
+      else ED.toast('This image is over 1 MB. Make it smaller and try again.', true);
+      return;
+    }
     var h = heightBySrc[t.img.getAttribute('src')] || 0;
     var body = new FormData();
     body.append('width', String(t.w));

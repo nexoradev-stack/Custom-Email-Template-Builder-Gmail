@@ -20,7 +20,8 @@ module.exports = {
   maxSourceBytes: 500 * 1024,
   gmailClipBytes: 102 * 1024,
   gmailWarnBytes: 80 * 1024,
-  maxImageBytes: 10 * 1024 * 1024,
-  warnImageBytes: 1024 * 1024,
+  /* Every image upload (library, editor, Customise, Copy into library) must be 1 MB or smaller. */
+  maxImageBytes: 1024 * 1024,
+  maxShare: 25,
   ticketMinutes: 10
 };

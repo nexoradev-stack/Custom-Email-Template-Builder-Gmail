@@ -24,7 +24,8 @@ Pick rows from the left (Header, Image, Text, Button, Image + text, Columns, Div
 `Cmd/Ctrl + Z` and `Cmd/Ctrl + Shift + Z`, or the ↶ ↷ buttons, for the last 50 changes. Typing undoes in bursts.
 
 ## Publish, versions and copies
-- **Publish for everyone** makes the template live in a few seconds. The thumbnail follows shortly; click **Refresh** in the panel.
+- **Publish for everyone** makes the template live in a few seconds. The thumbnail follows shortly; click the status line on the template page to update it.
+- **Share with people** (next to Publish) gives a draft only to the colleagues you name. They see it under **Shared with you** at the top of their gallery; nobody else does. They get a fixed copy: after you change the template, click **Share** again to send them the latest. Publishing for everyone ends the sharing.
 - **Versions** lists every publish with who and when. **Restore** puts an older one back as a new version.
 - **Make a copy** creates "name (copy)" as a draft.
 - **Unpublish** hides a template from users. **Delete** removes it.
@@ -34,7 +35,11 @@ Pick rows from the left (Header, Image, Text, Button, Image + text, Columns, Div
 Switch a category on or off for users (each switch saves straight away), add a category, rename it (its templates follow), or delete it (choose where its templates move).
 
 ## Image library
-Upload pictures once and reuse them. **Remove** takes a picture off the list; it's refused while a template uses it, and the file stays online so emails already sent never break.
+Upload pictures once and reuse them. Each picture must be **1 MB or smaller**: a bigger one shows a red message with **Reduce it here**, which opens the built-in image reducer, or a link to Google Squoosh.
+
+The image list shows where each picture is used. **Delete** works even when templates use it: the file stays online, so those templates, their old versions, people's customised copies and emails already sent keep showing it. It just leaves the list for new templates.
+
+An **image row left empty** in Build with blocks is simply left out of the email.
 
 ## Tips for templates that look great everywhere
 - Use **real text** for titles. Text inside pictures can't be edited and disappears for people who block images.

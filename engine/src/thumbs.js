@@ -6,18 +6,20 @@
  * only https images are allowed to load, so template code can't do anything else.
  */
 
-let puppeteer = null;
-try {
-  puppeteer = require('puppeteer-core');
-} catch (e) {
-  puppeteer = null;
+/* The browser library loads on first use, so the engine starts faster after a quiet period. */
+let puppeteer;
+function loadPuppeteer() {
+  if (puppeteer === undefined) {
+    try { puppeteer = require('puppeteer-core'); } catch (e) { puppeteer = null; }
+  }
+  return puppeteer;
 }
 
 const CHROME = process.env.CHROMIUM_PATH || '/usr/bin/chromium';
 let browserPromise = null;
 
 async function getBrowser() {
-  if (!puppeteer) throw new Error('Thumbnail renderer is not installed.');
+  if (!loadPuppeteer()) throw new Error('Thumbnail renderer is not installed.');
   if (!browserPromise) {
     browserPromise = puppeteer.launch({
       executablePath: CHROME,
@@ -34,7 +36,7 @@ async function getBrowser() {
 const FRAME_W = 680;
 const FRAME_H = 360;
 
-/** Returns a PNG buffer (2x scale) showing the top of the email. */
+/** Returns a JPEG (2x scale, quality 80: a fraction of a PNG's size) showing the top of the email. */
 async function renderThumbnail(html) {
   const browser = await getBrowser();
   const page = await browser.newPage();
@@ -54,7 +56,7 @@ async function renderThumbnail(html) {
       .email{width:600px;margin:24px auto 0;background:#FFFFFF;box-shadow:0 1px 3px rgba(4,10,27,.08)}
     </style></head><body><div class="email">${html}</div></body></html>`;
     await page.setContent(doc, { waitUntil: 'load', timeout: 8000 }).catch(() => {});
-    return await page.screenshot({ type: 'png', clip: { x: 0, y: 0, width: FRAME_W, height: FRAME_H } });
+    return await page.screenshot({ type: 'jpeg', quality: 80, clip: { x: 0, y: 0, width: FRAME_W, height: FRAME_H } });
   } finally {
     await page.close().catch(() => {});
   }

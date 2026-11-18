@@ -5,17 +5,19 @@
  * events.example.com) so it can be kept in the image library.
  *
  * Safety: only https links, only public internet addresses (never the server's
- * own network), at most 3 redirects, at most 10 MB, 10 seconds, images only.
+ * own network), at most 3 redirects, at most 1 MB, 10 seconds, images only.
  */
 
 const dns = require('dns').promises;
 const net = require('net');
 
-const MAX_BYTES = 10 * 1024 * 1024;
+const { MAX, tooBigMessage } = require('./imageLimit');
+
+const MAX_BYTES = MAX;
 const TIMEOUT_MS = 10000;
 
 class ImportError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, size) { super(message); this.status = status; this.size = size || null; }
 }
 
 /** True for addresses that are not on the public internet. */
@@ -75,13 +77,13 @@ async function fetchImage(raw, fetchImpl = fetch) {
       throw new ImportError(502, `That website did not send the image (error ${res.status}). Download it and use Upload instead.`);
     }
     const len = Number(res.headers.get('content-length') || 0);
-    if (len > MAX_BYTES) { clearTimeout(timer); throw new ImportError(413, 'That image is over 10 MB.'); }
+    if (len > MAX_BYTES) { clearTimeout(timer); throw new ImportError(413, tooBigMessage(len), len); }
     const chunks = [];
     let total = 0;
     try {
       for await (const chunk of res.body) {
         total += chunk.length;
-        if (total > MAX_BYTES) throw new ImportError(413, 'That image is over 10 MB.');
+        if (total > MAX_BYTES) throw new ImportError(413, tooBigMessage(0));
         chunks.push(Buffer.from(chunk));
       }
     } catch (e) {

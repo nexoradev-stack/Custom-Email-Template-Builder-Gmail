@@ -273,14 +273,20 @@ function processTemplate(source) {
 
   /* 6. Links */
   let deadLinks = 0;
+  let linkCount = 0;
   $('body a').each((i, el) => {
     const node = $(el);
     const href = (node.attr('href') || '').trim();
     if (/^javascript:/i.test(href)) node.attr('href', '#');
     if (!href || href === '#' || /^javascript:/i.test(href)) deadLinks++;
-    else if (!node.attr('target')) node.attr('target', '_blank');
+    else {
+      linkCount++;
+      if (!node.attr('target')) node.attr('target', '_blank');
+    }
   });
   if (deadLinks) add('warn', 'dead_links', `${deadLinks} link(s) still point to "#". Add the real URL.`);
+  /* Information only: how many links the template has (nothing is blocked). */
+  add('info', 'link_count', linkCount === 0 ? 'This template has no links.' : `This template has ${linkCount} link${linkCount === 1 ? '' : 's'}.`);
 
   /* 7. Merge tags from Salesforce */
   const tags = ($('body').text().match(/\{\{[^}]+\}\}|%%[^%]+%%|\{![^}]+\}/g) || []);
@@ -307,7 +313,7 @@ function processTemplate(source) {
     add('ok', 'size', `Size ${kb(bytes)}, under Gmail's 102 KB limit.`);
   }
 
-  const order = { error: 0, warn: 1, ok: 2 };
+  const order = { error: 0, warn: 1, ok: 2, info: 3 };
   checks.sort((a, b) => order[a.level] - order[b.level]);
   return { html, checks, hasErrors: checks.some((c) => c.level === 'error'), bytes };
 }

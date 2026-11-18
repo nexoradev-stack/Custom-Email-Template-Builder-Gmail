@@ -26,7 +26,20 @@ test('downloads an image and keeps its file name', async () => {
   assert.strictEqual(out.buffer.length, 5);
 });
 
-test('images over 10 MB are refused', async () => {
-  const fake = async () => ({ status: 200, ok: true, headers: new Map([['content-length', String(11 * 1024 * 1024)]]), body: [] });
-  await assert.rejects(fetchImage('https://8.8.8.8/big.jpg', fake), /over 10 MB/);
+test('images over 1 MB are refused, with their size', async () => {
+  const fake = async () => ({ status: 200, ok: true, headers: new Map([['content-length', String(3.4 * 1024 * 1024)]]), body: [] });
+  await assert.rejects(fetchImage('https://8.8.8.8/big.jpg', fake), (e) => e.status === 413 && /This image is 3\.4 MB\. The limit is 1 MB\./.test(e.message) && e.size > 0);
+});
+
+test('an image without a size header is still stopped once it passes 1 MB', async () => {
+  const body = (async function* () { for (let i = 0; i < 5; i++) yield Buffer.alloc(300 * 1024); })();
+  const fake = async () => ({ status: 200, ok: true, headers: new Map(), body });
+  await assert.rejects(fetchImage('https://8.8.8.8/big.jpg', fake), (e) => e.status === 413 && /limit is 1 MB/.test(e.message));
+});
+
+test('an image of exactly 1 MB is allowed', async () => {
+  const body = (async function* () { yield Buffer.alloc(1024 * 1024); })();
+  const fake = async () => ({ status: 200, ok: true, headers: new Map([['content-length', String(1024 * 1024)]]), body });
+  const out = await fetchImage('https://8.8.8.8/ok.jpg', fake);
+  assert.strictEqual(out.buffer.length, 1024 * 1024);
 });

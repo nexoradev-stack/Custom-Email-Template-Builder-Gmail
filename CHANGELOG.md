@@ -1,6 +1,13 @@
 # 📝 Changelog
 
 ## Unreleased
+- Images: 1 MB limit on every upload, with a red message offering **Reduce it here** (a new in-browser image reducer page) or Google Squoosh
+- Share with people: give a draft to named colleagues only; "Shared with you" in their gallery
+- Image library: shows where each image is used; delete works even when templates use it (they keep the picture)
+- Gmail check: link count line (information only); empty image rows are left out instead of blocking
+- Publish shows a simple "Published for everyone" confirmation
+- Gmail add-on redesign: category chips, icons on buttons, coloured status lines, a cleaner template page with a foldable Gmail check, new Images, Categories and Share pages
+- Speed: heavy tools load on first use, JPEG thumbnails, admin actions return the updated template in one call, a quick retry when the engine is waking up, and a 45-second gallery memory in the add-on
 - Docs: what it costs to run (no AI or API keys needed), with weekly, monthly and yearly examples and a simple way to calculate your own cost
 - Engine: page styles moved into CSS files
 

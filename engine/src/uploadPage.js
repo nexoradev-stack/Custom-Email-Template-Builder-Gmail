@@ -2,6 +2,9 @@
 
 const uploadCss = require('fs').readFileSync(require('path').join(__dirname, 'styles', 'upload.css'), 'utf8');
 
+/* The 1 MB image limit with the red "Reduce it here" box. */
+const { CLIENT: imgLimitJs } = require('./imageLimit');
+
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /** The small pop-up window an admin uses to upload an image. */
@@ -26,15 +29,19 @@ ${uploadCss}
     <div class="drop" id="drop">
       <label class="btn" for="file">Choose file</label>
       <input class="sr" id="file" type="file" accept="image/png,image/jpeg,image/gif">
-      <div class="hint">or drag an image here &middot; JPG, PNG or GIF &middot; up to 10 MB</div>
+      <div class="hint">or drag an image here &middot; JPG, PNG or GIF &middot; <b>up to 1 MB</b></div>
     </div>
 
+    <div id="big"></div>
     <div id="status" role="status" aria-live="polite"></div>
     <div id="results"></div>
 
     <p class="foot">When you're done, close this window to go back to Gmail.</p>
   </div>
 </div>
+<script>
+${imgLimitJs}
+</script>
 <script>
 (function () {
   var ticket = ${JSON.stringify(String(ticket))};
@@ -81,15 +88,20 @@ ${uploadCss}
 
   function upload(f) {
     if (!f) return;
-    if (!/^image\\/(png|jpeg|gif)$/.test(f.type)) { show('err', 'Only JPG, PNG or GIF images can be uploaded.'); return; }
-    if (f.size > 10 * 1024 * 1024) { show('err', 'That image is over 10 MB. Make it smaller and try again.'); return; }
+    var big = document.getElementById('big');
+    IMGLIMIT.clear(big);
+    if (!/^image\\/(png|jpeg|gif)$/.test(f.type)) { show('err', 'Only JPG, PNG or GIF images can be uploaded. The image reducer can turn other pictures into JPG.'); return; }
+    if (f.size > IMGLIMIT.max) { show('', ''); IMGLIMIT.show(big, f.size, null, 'Reduce it, download the smaller copy, then choose it here.'); return; }
     show('warn', 'Uploading…');
     var body = new FormData();
     body.append('image', f);
     fetch('/upload?ticket=' + encodeURIComponent(ticket), { method: 'POST', body: body })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
-        if (!res.ok) { show('err', res.j.error || 'Upload failed. Try again.'); return; }
+        if (!res.ok) {
+          if (res.j.tooBig) { show('', ''); IMGLIMIT.show(big, res.j.size || f.size, null, 'Reduce it, download the smaller copy, then choose it here.'); return; }
+          show('err', res.j.error || 'Upload failed. Try again.'); return;
+        }
         show('', '');
         addResult(res.j);
       })

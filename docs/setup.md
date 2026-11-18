@@ -88,6 +88,8 @@ gcloud run deploy template-engine --source . --region us-central1 \
   --memory 2Gi --cpu 1 --max-instances 3 --timeout 60 --cpu-boost
 ```
 
+> Optional: add `--min-instances 1` to keep one copy of the engine always running. The add-on then opens without a wait after quiet periods (Google charges for the always-on instance).
+
 When it finishes, copy the **Service URL**, for example `https://template-engine-abc123-uc.a.run.app`. Check that `https://…/health` answers `{"ok":true}`.
 
 > `--allow-unauthenticated` only opens the door. Every request is still checked: the API needs a Google sign-in token from your domain, and the editor pages need a one-time ticket.

@@ -20,16 +20,22 @@ if (/<\/script/i.test(builderJs)) throw new Error('builder.client.js must not co
 const htmlEditJs = fs.readFileSync(path.join(__dirname, 'htmledit.client.js'), 'utf8');
 if (/<\/script/i.test(htmlEditJs)) throw new Error('htmledit.client.js must not contain a closing script tag');
 
+/* The 1 MB image limit: grey hint and red "Reduce it here" box, shared with the other upload screens. */
+const { CLIENT: imgLimitJs } = require('./imageLimit');
+
 /** JSON that is safe to put inside a <script> tag. */
 const safeJson = (v) => JSON.stringify(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-function editorPage({ ticket, template, categories, fonts, libraryPrefix }) {
+function editorPage({ ticket, template, categories, fonts, libraryPrefix, domain: rawDomain }) {
+  const domain = escHtml(rawDomain || 'example.com');
   const boot = {
     ticket: String(ticket),
     template: template || null,
     categories: categories || [],
     fonts: fonts || [],
-    libraryPrefix: libraryPrefix || ''
+    libraryPrefix: libraryPrefix || '',
+    domain: String(rawDomain || 'example.com')
   };
   return `<!DOCTYPE html>
 <html lang="en">
@@ -54,8 +60,11 @@ ${editorCss}
     </div>
     <span class="status" id="status"></span>
     <span class="grow"></span>
-    <button class="btn" id="save" type="button">Save and check</button>
-    <button class="btn fill" id="publish" type="button">Publish for everyone</button>
+    <div class="topbtns">
+      <button class="btn" id="save" type="button">Save and check</button>
+      <button class="btn" id="share" type="button">Share with people</button>
+      <button class="btn fill" id="publish" type="button">Publish for everyone</button>
+    </div>
   </div>
 
   <div class="bmain" id="blocksView" hidden>
@@ -117,6 +126,31 @@ ${editorCss}
     </div>
   </div>
 
+  <div class="modal" id="doneBox" role="dialog" aria-modal="true" aria-labelledby="doneTitle" hidden>
+    <div class="mbox" style="min-width:340px">
+      <h3 id="doneTitle">Published for everyone</h3>
+      <div class="mbtns" style="margin-top:16px"><button type="button" class="btn fill" id="doneOk">OK</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="shareBox" role="dialog" aria-modal="true" aria-labelledby="shareTitle" hidden>
+    <div class="mbox" style="max-width:560px;width:100%">
+      <h3 id="shareTitle">Share with specific people</h3>
+      <p id="shareLead">Only the people you add will see this template in their gallery. Everyone else won't. It stays a draft for everyone else.</p>
+      <div class="mlab">ADD PEOPLE AT ${String(domain || '').toUpperCase()}</div>
+      <div class="chips" id="shareChips"><input id="shareInput" type="email" autocomplete="off" placeholder="Type an email, then press Enter" aria-label="Email address"></div>
+      <div class="mnote">Only ${String(domain || '')} email addresses can be added. Press Enter or comma after each one.</div>
+      <div class="minfo" id="shareInfo">They will see it under <b>Shared with you</b> at the top of their gallery in Gmail.</div>
+      <div class="merr" id="shareErr" hidden></div>
+      <div class="mbtns">
+        <button type="button" class="btn" id="shareStop" hidden>Stop sharing</button>
+        <span class="grow"></span>
+        <button type="button" class="btn" id="shareCancel">Cancel</button>
+        <button type="button" class="btn fill" id="shareGo">Share</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="switchBox" role="dialog" aria-modal="true" aria-labelledby="switchTitle" hidden>
     <div class="mbox">
       <h3 id="switchTitle"></h3>
@@ -125,6 +159,9 @@ ${editorCss}
     </div>
   </div>
 
+<script>
+${imgLimitJs}
+</script>
 <script>
 (function () {
   var BOOT = ${safeJson(boot)};
@@ -150,13 +187,28 @@ ${editorCss}
     return JSON.stringify(payload()) !== savedJson;
   }
 
+  var sharedWith = (t.sharedWith || []).slice();
+  var sharedStale = Boolean(t.sharedStale);
+
+  function shortName(email) { var n = String(email).split('@')[0].split(/[._-]/)[0] || email; return n.charAt(0).toUpperCase() + n.slice(1); }
+  function peopleText(list) {
+    var names = list.map(shortName);
+    return names.length <= 2 ? names.join(' and ') : names.slice(0, 2).join(', ') + ' and ' + (names.length - 2) + ' more';
+  }
+
   function setStatus() {
     var s = $('status');
+    var shared = t.status !== 'published' && sharedWith.length > 0;
     var label = t.status === 'published' ? (t.hasUnpublishedChanges ? 'Published · changes not live' : 'Published · live')
+      : shared ? 'Shared with ' + peopleText(sharedWith) + (sharedStale ? ' · changes not shared yet' : '')
       : t.status === 'unpublished' ? 'Unpublished' : t.status === 'draft' ? 'Draft · admins only' : 'Not saved yet';
     if (dirty()) label += ' · unsaved edits';
     s.textContent = label;
-    s.className = 'status' + (t.status === 'published' && !t.hasUnpublishedChanges && !dirty() ? ' live' : t.status === 'new' ? '' : ' draft');
+    s.title = label;
+    s.className = 'status' + (t.status === 'published' && !t.hasUnpublishedChanges && !dirty() ? ' live' : shared ? ' shared' : t.status === 'new' ? '' : ' draft');
+    var sb = $('share');
+    sb.hidden = false;
+    sb.textContent = shared ? 'Shared · ' + sharedWith.length + (sharedWith.length === 1 ? ' person' : ' people') : 'Share with people';
   }
 
   function toast(text, isErr) {
@@ -252,7 +304,7 @@ ${editorCss}
       var d = document.createElement('div');
       d.className = 'c-' + c.level;
       var b = document.createElement('b');
-      b.textContent = c.level === 'error' ? 'Fix: ' : c.level === 'warn' ? 'Check: ' : '✓ ';
+      b.textContent = c.level === 'error' ? 'Fix: ' : c.level === 'warn' ? 'Check: ' : c.level === 'info' ? 'ⓘ ' : '✓ ';
       d.appendChild(b);
       d.appendChild(document.createTextNode(c.message));
       box.appendChild(d);
@@ -300,6 +352,7 @@ ${editorCss}
     busy = on;
     $('save').disabled = on;
     $('publish').disabled = on;
+    $('share').disabled = on;
   }
 
   function payload() {
@@ -340,6 +393,8 @@ ${editorCss}
     savedJson = JSON.stringify(payload());
     t.status = r.status || (t.status === 'new' ? 'draft' : t.status);
     t.hasUnpublishedChanges = Boolean(r.hasUnpublishedChanges);
+    if (r.sharedWith) sharedWith = r.sharedWith.slice();
+    if (r.sharedStale !== undefined) sharedStale = Boolean(r.sharedStale);
     if (r.checks) showChecks(r.checks);
     paintLocks(); renderLocks();
     setStatus();
@@ -362,8 +417,9 @@ ${editorCss}
     lock(true);
     post('/editor/publish', withBase(payload(), force === true)).then(function (r) {
       afterSave(r);
-      t.status = 'published'; t.hasUnpublishedChanges = false; setStatus();
-      toast('Published (v' + r.version + '). Everyone can use it now. Go back to the Gmail tab and click Refresh.');
+      t.status = 'published'; t.hasUnpublishedChanges = false; sharedWith = []; sharedStale = false; setStatus();
+      $('doneBox').hidden = false;
+      $('doneOk').focus();
     }).catch(function (e) {
       if (e.data && e.data.conflict) { showConflict(e.data.conflict, function () { publish(true); }); return; }
       if (e.data && e.data.checks) showChecks(e.data.checks);
@@ -373,6 +429,121 @@ ${editorCss}
 
   $('save').addEventListener('click', function () { save(false); });
   $('publish').addEventListener('click', function () { publish(false); });
+  $('doneOk').addEventListener('click', function () { $('doneBox').hidden = true; });
+
+  /* ---------- Share with specific people ---------- */
+  var draftPeople = [];
+  var DOMAIN = String(BOOT.domain || '').toLowerCase();
+
+  function shareError(text) { $('shareErr').hidden = !text; $('shareErr').textContent = text || ''; }
+
+  function drawChips() {
+    var box = $('shareChips'), input = $('shareInput');
+    Array.prototype.slice.call(box.querySelectorAll('.chip')).forEach(function (c) { c.remove(); });
+    draftPeople.forEach(function (email, i) {
+      var c = document.createElement('span');
+      c.className = 'chip';
+      var av = document.createElement('i'); av.textContent = shortName(email).charAt(0);
+      var b = document.createElement('b'); b.textContent = shortName(email); b.style.fontWeight = '600';
+      var e = document.createElement('span'); e.textContent = email; e.style.color = '#5F6368';
+      var x = document.createElement('button'); x.type = 'button'; x.textContent = '✕'; x.setAttribute('aria-label', 'Remove ' + email);
+      x.addEventListener('click', function () { draftPeople.splice(i, 1); drawChips(); });
+      c.appendChild(av); c.appendChild(b); c.appendChild(e); c.appendChild(x);
+      box.insertBefore(c, input);
+    });
+    var n = draftPeople.length;
+    var same = n === sharedWith.length && draftPeople.every(function (p) { return sharedWith.indexOf(p) !== -1; });
+    $('shareGo').textContent = !n ? (sharedWith.length ? 'Stop sharing' : 'Share') : (same && sharedWith.length ? 'Share again with ' : 'Share with ') + n + (n === 1 ? ' person' : ' people');
+    $('shareGo').disabled = !n && !sharedWith.length;
+    $('shareStop').hidden = !sharedWith.length || !n;
+    $('shareInfo').innerHTML = '';
+    $('shareInfo').appendChild(document.createTextNode(n === 1 ? shortName(draftPeople[0]) + ' will see it under ' : 'They will see it under '));
+    var strong = document.createElement('b'); strong.textContent = 'Shared with you';
+    $('shareInfo').appendChild(strong);
+    $('shareInfo').appendChild(document.createTextNode(' at the top of ' + (n === 1 ? 'their' : 'their') + ' gallery in Gmail.' + (sharedStale ? ' You have changes they don\\'t have yet: click Share again to send them the latest version.' : '')));
+  }
+
+  function addPerson(raw) {
+    var parts = String(raw || '').split(/[\\s,;]+/);
+    var bad = '';
+    parts.forEach(function (p) {
+      var email = p.trim().toLowerCase();
+      if (!email) return;
+      if (!/^[^\\s@<>"']+@[^\\s@<>"']+\\.[a-z]{2,}$/.test(email)) { bad = '"' + p + '" is not an email address.'; return; }
+      if (DOMAIN && email.slice(-DOMAIN.length - 1) !== '@' + DOMAIN) { bad = 'Only ' + DOMAIN + ' addresses can be added.'; return; }
+      if (draftPeople.indexOf(email) === -1) draftPeople.push(email);
+    });
+    shareError(bad);
+    drawChips();
+    return !bad;
+  }
+
+  function shareMode(published) {
+    ['shareChips', 'shareInfo', 'shareGo', 'shareStop'].forEach(function (id) { $(id).hidden = published; });
+    $('shareBox').querySelector('.mlab').hidden = published;
+    $('shareBox').querySelector('.mnote').hidden = published;
+    $('shareLead').textContent = published
+      ? 'This template is published for everyone, so everyone already has it. To give it only to specific people, unpublish it in the Gmail add-on first (template page, More options, Unpublish), then share it here.'
+      : 'Only the people you add will see this template in their gallery. Everyone else won’t. It stays a draft for everyone else.';
+    $('shareCancel').textContent = published ? 'OK' : 'Cancel';
+  }
+
+  function openShare() {
+    if (busy) return;
+    shareMode(t.status === 'published');
+    if (t.status === 'published') { shareError(''); $('shareBox').hidden = false; $('shareCancel').focus(); return; }
+    draftPeople = sharedWith.slice();
+    shareError('');
+    $('shareInput').value = '';
+    drawChips();
+    $('shareBox').hidden = false;
+    $('shareInput').focus();
+  }
+
+  function doShare(people, force) {
+    if (busy) return;
+    lock(true);
+    var body = withBase(payload(), force === true);
+    body.people = people;
+    post('/editor/share', body).then(function (r) {
+      afterSave(r);
+      sharedWith = (r.sharedWith || []).slice();
+      sharedStale = false;
+      setStatus();
+      $('shareBox').hidden = true;
+      toast(sharedWith.length ? 'Shared with ' + peopleText(sharedWith) + '. They will see it in their gallery in Gmail.' : 'Stopped sharing. Only admins can see it now.');
+    }).catch(function (e) {
+      if (e.data && e.data.conflict) { $('shareBox').hidden = true; showConflict(e.data.conflict, function () { doShare(people, true); }); return; }
+      if (e.data && e.data.checks) showChecks(e.data.checks);
+      shareError(e.message);
+    }).then(function () { lock(false); });
+  }
+
+  $('share').addEventListener('click', openShare);
+  $('shareCancel').addEventListener('click', function () { $('shareBox').hidden = true; });
+  $('shareChips').addEventListener('click', function () { $('shareInput').focus(); });
+  $('shareInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ';' || e.key === ' ') {
+      e.preventDefault();
+      if ($('shareInput').value.trim()) { if (addPerson($('shareInput').value)) $('shareInput').value = ''; }
+      else if (e.key === 'Enter' && draftPeople.length) $('shareGo').click();
+    } else if (e.key === 'Backspace' && !$('shareInput').value && draftPeople.length) {
+      draftPeople.pop(); drawChips();
+    }
+  });
+  $('shareInput').addEventListener('blur', function () { if ($('shareInput').value.trim() && addPerson($('shareInput').value)) $('shareInput').value = ''; });
+  $('shareInput').addEventListener('paste', function (e) {
+    var text = (e.clipboardData || window.clipboardData).getData('text');
+    if (/[\\s,;]/.test(text.trim())) { e.preventDefault(); addPerson(text); }
+  });
+  $('shareGo').addEventListener('click', function () {
+    if ($('shareInput').value.trim()) { if (!addPerson($('shareInput').value)) return; $('shareInput').value = ''; }
+    doShare(draftPeople.slice());
+  });
+  $('shareStop').addEventListener('click', function () { doShare([]); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { if (!$('shareBox').hidden) $('shareBox').hidden = true; if (!$('doneBox').hidden) $('doneBox').hidden = true; }
+  });
   document.addEventListener('keydown', function (e) {
     if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); save(false); }
   });
@@ -401,6 +572,7 @@ ${editorCss}
     libraryPrefix: BOOT.libraryPrefix,
     post: post,
     toast: toast,
+    maxImage: window.IMGLIMIT ? window.IMGLIMIT.max : 1048576,
     name: function () { return nameEl.value; },
     code: function () { return code.value; },
     setCode: function (v) { code.value = v; check(); if (ED.onCodeSet) ED.onCodeSet(); },

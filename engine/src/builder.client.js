@@ -94,8 +94,9 @@
 
   function imgTag(src, alt, w, editor, block, align, h) {
     if (!src) {
-      if (!editor) return '<img src="" alt="' + esc(alt) + '" width="' + w + '">';
-      return '<div style="height:' + (h || Math.round(w / 2.4)) + 'px;max-width:' + w + 'px;margin:' + (align === 'center' ? '0 auto' : '0') + ';background:#E8EAED;border:2px dashed __ACCENT_LIGHT__;border-radius:6px;display:flex;align-items:center;justify-content:center;font:13px ' + FONT + ';color:#5F6368">Choose an image on the right</div>';
+      /* No picture chosen: nothing goes into the email (the admin decides whether to add one). */
+      if (!editor) return '';
+      return '<div style="height:' + (h || Math.round(w / 2.4)) + 'px;max-width:' + w + 'px;margin:' + (align === 'center' ? '0 auto' : '0') + ';background:#E8EAED;border:2px dashed __ACCENT_LIGHT__;border-radius:6px;display:flex;align-items:center;justify-content:center;font:13px ' + FONT + ';color:#5F6368;text-align:center;padding:0 12px">Choose an image on the right, or leave it empty: an empty image is left out of the email</div>';
     }
     var disp = block ? 'display:block;' : 'display:inline-block;';
     return '<img src="' + esc(src) + '" alt="' + esc(alt) + '" width="' + w + '" style="' + disp + 'width:100%;max-width:' + w + 'px;height:auto;border:0;">';
@@ -125,6 +126,7 @@
         return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="' + a + '" style="' + (a === 'center' ? 'margin:0 auto;' : '') + '"><tr><td style="background:' + color(r.s.bgc, '__ACCENT__') + ';border-radius:' + px(r.s.radius) + 'px;">' +
           '<a href="' + esc(r.c.url || '#') + '" target="_blank" style="display:inline-block;padding:12px 28px;font-family:' + fontStack(r.s.font) + ';font-size:' + px(r.s.size || 15) + 'px;font-weight:bold;line-height:20px;color:' + color(r.s.color, '#FFFFFF') + ';text-decoration:none;border-radius:' + px(r.s.radius) + 'px;">' + esc(r.c.label || 'Button') + '</a></td></tr></table>';
       case 'imageText':
+        if (!editor && !r.c.src) return '<div style="' + textStyle(r) + '">' + (r.c.html || '') + '</div>';
         var iw = sideImageWidth(r);
         var img = '<td width="' + iw + '" valign="top" style="width:' + iw + 'px;">' + imgTag(r.c.src, r.c.alt, iw, editor, true, 'left', r.c.h) + '</td>';
         var txt = '<td valign="top" style="' + (r.s.side === 'right' ? 'padding-right:20px;' : 'padding-left:20px;') + '"><div' + f('html') + ' style="' + textStyle(r) + '">' + (r.c.html || '') + '</div></td>';
@@ -178,7 +180,13 @@
   }
 
   function toHtml(model, editor) {
-    var rows = model.rows.map(function (r) { return rowHtml(r, editor); }).join('\n');
+    /* Image rows (and image headers) without a picture are left out of the email. */
+    var rows = model.rows.filter(function (r) {
+      if (editor) return true;
+      if (r.type === 'image' && !r.c.src) return false;
+      if (r.type === 'header' && r.s.style === 'image' && !r.c.src) return false;
+      return true;
+    }).map(function (r) { return rowHtml(r, editor); }).join('\n');
     var page = color(model.page, '#F1F3F4');
     var bg = color(model.bg, '#FFFFFF');
     return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>' + esc(ED.name() || 'Email') + '</title>\n</head>\n<body style="margin:0;background:' + page + ';">\n' +
@@ -507,7 +515,7 @@
   function showChecks(checks) {
     var box = $('bchecks');
     box.innerHTML = '';
-    var errors = (checks || []).filter(function (c) { return c.level !== 'ok'; });
+    var errors = (checks || []).filter(function (c) { return c.level === 'error' || c.level === 'warn'; });
     var title = document.createElement('div');
     title.className = 'bh';
     title.textContent = errors.length ? 'GMAIL CHECK · ' + errors.length + ' to look at' : 'GMAIL CHECK · all good';
@@ -516,7 +524,7 @@
       var d = document.createElement('div');
       d.className = 'c-' + c.level;
       var b = document.createElement('b');
-      b.textContent = c.level === 'error' ? 'Fix: ' : c.level === 'warn' ? 'Check: ' : '✓ ';
+      b.textContent = c.level === 'error' ? 'Fix: ' : c.level === 'warn' ? 'Check: ' : c.level === 'info' ? 'ⓘ ' : '✓ ';
       d.appendChild(b);
       d.appendChild(document.createTextNode(c.message));
       box.appendChild(d);
@@ -737,7 +745,7 @@
     var up = el('button', 'btn sm fill', 'Upload');
     up.type = 'button';
     up.addEventListener('click', function () {
-      pending = { r: r, target: target, widthFn: widthFn };
+      pending = { r: r, target: target, widthFn: widthFn, box: box, after: row2 };
       $('bfile').click();
     });
     var lib = el('button', 'btn sm', 'From library');
@@ -746,6 +754,7 @@
     row2.appendChild(up);
     row2.appendChild(lib);
     box.appendChild(row2);
+    if (window.IMGLIMIT) box.appendChild(window.IMGLIMIT.hint());
 
     var link = document.createElement('input');
     link.type = 'text';
@@ -855,7 +864,12 @@
     if (!f || !pending) return;
     var target = pending;
     pending = null;
-    if (f.size > 10 * 1024 * 1024) { ED.toast('That image is over 10 MB. Make it smaller and try again.', true); return; }
+    if (window.IMGLIMIT) window.IMGLIMIT.clear(target.box);
+    if (f.size > ED.maxImage) {
+      if (window.IMGLIMIT && target.box) window.IMGLIMIT.show(target.box, f.size, target.after);
+      else ED.toast('This image is over 1 MB. Make it smaller and try again.', true);
+      return;
+    }
     var body = new FormData();
     body.append('width', String(target.widthFn()));
     body.append('height', String(target.target.h || 0));

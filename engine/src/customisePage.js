@@ -10,6 +10,8 @@ const customiseCss = require('fs').readFileSync(require('path').join(__dirname, 
  */
 
 const safeJson = (v) => JSON.stringify(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+/* The 1 MB photo limit with the red "Reduce it here" box. */
+const { CLIENT: imgLimitJs } = require('./imageLimit');
 
 function customisePage({ ticket, name, category, html, blocks, locks }) {
   const boot = { ticket: String(ticket), name, category, html, blocks, locks: locks || [] };
@@ -50,6 +52,9 @@ ${customiseCss}
     </div>
   </div>
 
+<script>
+${imgLimitJs}
+</script>
 <script>
 (function () {
   var BOOT = ${safeJson(boot)};
@@ -196,7 +201,7 @@ ${customiseCss}
       var hint = document.createElement('p');
       hint.style.fontSize = '12px';
       hint.style.color = '#5F6368';
-      hint.textContent = 'JPG, PNG or WebP · up to 10 MB.';
+      hint.textContent = 'JPG, PNG, WebP or GIF · up to 1 MB.';
       panel.appendChild(hint);
     } else {
       h.textContent = 'TEXT';
@@ -355,8 +360,9 @@ ${customiseCss}
     if (!f || !selected) return;
     var id = selected;
     var el = blockEl(id);
-    if (!/^image\\/(jpeg|png|webp|gif)$/.test(f.type)) { panel.prepend(message('err', 'Choose a JPG, PNG or WebP photo.')); return; }
-    if (f.size > 10 * 1024 * 1024) { panel.prepend(message('err', 'That photo is over 10 MB. Choose a smaller one.')); return; }
+    if (!/^image\\/(jpeg|png|webp|gif)$/.test(f.type)) { panel.prepend(message('err', 'Choose a JPG, PNG, WebP or GIF photo.')); return; }
+    if (window.IMGLIMIT) window.IMGLIMIT.clear(panel);
+    if (f.size > IMGLIMIT.max) { IMGLIMIT.show(panel, f.size, panel.querySelector('.stack'), 'Reduce it, download the smaller copy, then click Choose photo again.'); return; }
     var r = el.getBoundingClientRect();
     var body = new FormData();
     body.append('w', String(Math.max(1, Math.round(r.width))));
@@ -365,7 +371,7 @@ ${customiseCss}
     body.append('image', f);
     busy = true; el.classList.add('busy'); renderPanel();
     fetch('/customise/image?ticket=' + encodeURIComponent(BOOT.ticket), { method: 'POST', body: body })
-      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { if (!res.ok) throw new Error(j.error || 'Upload failed. Try again.'); return j; }); })
+      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { if (!res.ok) { var er = new Error(j.error || 'Upload failed. Try again.'); er.data = j; throw er; } return j; }); })
       .then(function (j) {
         el.setAttribute('src', j.url);
         busy = false; el.classList.remove('busy');
@@ -375,7 +381,8 @@ ${customiseCss}
       .catch(function (e) {
         busy = false; el.classList.remove('busy');
         renderPanel();
-        panel.prepend(message('err', e.message));
+        if (e.data && e.data.tooBig) IMGLIMIT.show(panel, e.data.size || f.size, panel.querySelector('.stack'), 'Reduce it, download the smaller copy, then click Choose photo again.');
+        else panel.prepend(message('err', e.message));
       });
   });
 
