@@ -49,7 +49,9 @@ Marketing teams design beautiful emails in Figma, Canva or with AI, but getting 
 | 🪄 **Image reducer** | Too-big image? A red message offers **Reduce it here**: a built-in page that makes a copy under 1 MB right in the browser (or use Google Squoosh) |
 | 🤝 **Share with people** | Give a draft to named colleagues only; it shows under **Shared with you** for them and nobody else |
 | ↩️ **Undo, redo & versions** | Last 50 changes, `Cmd + Z`; every publish is kept and can be **restored** |
-| 👥 **Teamwork** | Make a copy, categories (show/hide, rename, delete), a warning when two admins save the same template |
+| 👥 **Teamwork** | Make a copy, categories (rename, delete), a warning when two admins save the same template |
+| 🎯 **Who sees what** | Make **Teams** (named lists of people) and give each category to everyone, or only to chosen teams and single email addresses. New categories start as admins only |
+| 🙈 **Hidden switch** | Hide any template (published, draft or shared) from users and the people it's shared with. Admins always see it, under a **Hidden** filter |
 | ⚡ **Fast publish** | Live in a few seconds; the gallery thumbnail is made in the background |
 | 🔗 **Link count** | The Gmail check tells you how many links a template has (information only) |
 

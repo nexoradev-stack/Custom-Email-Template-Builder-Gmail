@@ -99,7 +99,7 @@ test('categories: defaults, switch on/off, add, and bad names', () => {
   assert.strictEqual(cats.isVisible(start, 'events'), false);
 
   const next = cats.applyChanges(start, { visible: ['Events', 'sales'], add: 'Partners' });
-  assert.deepStrictEqual(next.filter((c) => c.visible).map((c) => c.name), ['Events', 'Sales', 'Partners']);
+  assert.deepStrictEqual(next.filter((c) => c.visible).map((c) => c.name), ['Events', 'Sales'], 'a new category starts as admins only');
   assert.strictEqual(next.length, start.length + 1, 'nothing is ever removed');
 
   assert.throws(() => cats.applyChanges(next, { add: 'partners' }), /already exists/);

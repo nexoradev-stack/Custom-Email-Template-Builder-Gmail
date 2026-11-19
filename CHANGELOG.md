@@ -1,6 +1,10 @@
 # 📝 Changelog
 
 ## Unreleased
+- Teams: make named lists of people (add by email, rename, delete) from the new **Teams** page
+- Who sees what: each category is seen by everyone, or only by chosen teams and single email addresses. New categories start as admins only. People with nothing see "No templates for you yet"
+- Hidden switch on every template: hidden from users and from people it's shared with (sharing pauses and comes back when switched off); admins always see it, with a **Hidden** filter in the gallery. Old preview links show "This template isn't available"
+- Fix: opening a template page from the admin gallery no longer says "Template not found"
 - Images: 1 MB limit on every upload, with a red message offering **Reduce it here** (a new in-browser image reducer page) or Google Squoosh
 - Share with people: give a draft to named colleagues only; "Shared with you" in their gallery
 - Image library: shows where each image is used; delete works even when templates use it (they keep the picture)

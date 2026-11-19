@@ -16,8 +16,12 @@ function sharedList(d) {
   return d.status !== 'published' && Array.isArray(d.sharedWith) ? d.sharedWith : [];
 }
 
-/** How this person may use a template: 'published' (everyone), 'shared' (named for them) or null. */
-function accessFor(d, user) {
+/**
+ * How this person may use a template: 'published' (everyone), 'shared' (named for them) or null.
+ * A hidden template gives no access, except to admins (opts.admin).
+ */
+function accessFor(d, user, opts = {}) {
+  if (d.hidden && !opts.admin) return null;
   if (d.status === 'published' && d.publishedHtml) return 'published';
   /* sharedAt is set together with the shared copy, so a list without a copy never gives access. */
   if (d.sharedAt && sharedList(d).includes(String(user.email || '').toLowerCase())) return 'shared';

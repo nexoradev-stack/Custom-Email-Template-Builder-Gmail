@@ -47,6 +47,7 @@ flowchart TB
 1. Every API call from the add-on carries the person's **Google OAuth access token**.
 2. `auth.js` checks it with Google: the email is verified, ends with `@ALLOWED_DOMAIN`, and the token was issued to **this add-on's** OAuth client (by `OAUTH_CLIENT_ID`, or the `PROJECT_NUMBER` prefix). Results are cached for 5 minutes.
 3. **Admins** are members of `ADMIN_GROUP`, looked up in Cloud Identity with the person's own token. `ADMIN_EMAILS` is an optional safety net.
+   **Users** see only the categories given to them (everyone, one of their teams, or their email) and never see hidden templates. The engine checks this on the gallery, search, preview, customise and direct template links.
 4. The editor, customise, preview and upload pages open in a **browser tab**. The add-on first asks the engine for a **one-time ticket** (valid 10 minutes, tied to the person and the template) and opens `…/editor?ticket=…`. The page uses the ticket for its calls, so no Google token ever sits in a URL.
 5. Pages are sent with a strict **Content-Security-Policy**. Email previews render in **sandboxed iframes**, so code in a pasted template can never run.
 
@@ -97,7 +98,7 @@ Switching from Paste HTML to blocks keeps the pasted code safe until the admin c
 | `templates` | name, category, mode, source HTML / block model, locks, status, published HTML, version, thumbnail, who changed it and when |
 | `templates/{id}/versions` | every published version, for **Restore** |
 | `images` | the image library: name, public URL, size, who uploaded it; `sourceUrl` for copies of outside pictures |
-| `settings` | categories: order, names, visible to users |
+| `settings` | categories (order, names, who can see each: everyone, or team ids and email addresses) and teams (name and members) |
 | `tickets` | one-time tickets for the browser pages (short-lived) |
 | `custom` | each person's customised copy (one at a time, 24 hours) |
 
@@ -118,7 +119,9 @@ Two admins editing at once: every save sends the time the admin's copy was loade
 | `GET /api/templates` · `GET /api/templates/:id` | everyone | Gallery and template details |
 | `POST /api/templates` · `/publish` · `/unpublish` · `/delete` · `/copy` | admins | Manage templates |
 | `GET /api/templates/:id/versions` · `POST /restore` | admins | Versions |
-| `GET/POST /api/categories` | admins | Categories: show, hide, add, rename, delete |
+| `GET/POST /api/categories` | admins | Categories: who can see each, add, rename, delete |
+| `GET/POST /api/teams` | admins | Teams: create, rename, delete, add and remove people |
+| `POST /api/templates/:id/hidden` | admins | Hide a template from users, or show it again |
 | `GET /api/images` · `POST /api/images/remove` | admins | Image library |
 | `POST /api/editor-ticket` → `GET /editor` | admins | Editor tab |
 | `/editor/check` · `/save` · `/publish` · `/upload` · `/crop` · `/import` · `/images` | editor tab | Editor actions |

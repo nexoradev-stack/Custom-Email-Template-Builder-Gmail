@@ -31,7 +31,6 @@ var APP_NAME = 'Template Gallery';
 var BLUE = '#6C3BFF';
 
 /* ========================================================================== */
-
 var ASSETS = API_BASE + '/assets/';
 var LINK = '#0B57D0';
 var GREY = '#5F6368';
@@ -127,9 +126,19 @@ function buildGalleryCard_(state) {
     card.addSection(shared);
   }
 
-  var filters = CardService.newCardSection().setHeader('PICK A CATEGORY');
-  filters.addWidget(categoryChips_(categories, state.category || '', '', false));
-  card.addSection(filters);
+  /* Nothing given to this person yet (no categories, nothing shared). */
+  if (!categories.length && !mine.length && !items.length && !state.q) {
+    card.addSection(CardService.newCardSection()
+      .addWidget(withStartIcon_(CardService.newDecoratedText()
+        .setText('<b>No templates for you yet</b>')
+        .setBottomLabel('Ask an admin to add you to a team.')
+        .setWrapText(true), 'person', GREY)));
+    return card.build();
+  }
+
+  if (categories.length) {
+    card.addSection(CardService.newCardSection().addWidget(categoryChips_(categories, state.category || '', '', false)));
+  }
 
   if (!items.length) {
     card.addSection(CardService.newCardSection().addWidget(CardService.newTextParagraph().setText(
@@ -173,6 +182,7 @@ function buildAdminGallery_(card, state, items, categories) {
     .addWidget(CardService.newButtonSet()
       .addButton(withIcon_(button_('Images', 'showImages', {}, 'borderless'), 'image'))
       .addButton(withIcon_(button_('Categories', 'showCategories', {}, 'borderless'), 'category'))
+      .addButton(withIcon_(button_('Teams', 'showTeams', {}, 'borderless'), 'group'))
       .addButton(withIcon_(button_('View as user', 'viewAsUser', {}, 'borderless'), 'person')))
     .addWidget(CardService.newTextInput()
       .setFieldName('q')
@@ -183,11 +193,14 @@ function buildAdminGallery_(card, state, items, categories) {
 
   if (!items.length) {
     card.addSection(CardService.newCardSection().addWidget(CardService.newTextParagraph().setText(
-      state.q || state.category ? 'No templates found here.' : 'No templates yet. Click New template to add one.')));
+      state.category === 'hidden' ? 'No hidden templates.' : state.q || state.category ? 'No templates found here.' : 'No templates yet. Click New template to add one.')));
     return card.build();
   }
   var shown = items.slice(0, MAX_LIST);
   var section = CardService.newCardSection();
+  if (state.category === 'hidden') {
+    section.addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">' + items.length + (items.length === 1 ? ' hidden template' : ' hidden templates') + '. Only admins see these.</font>'));
+  }
   shown.forEach(function (t) {
     section.addWidget(CardService.newDecoratedText()
       .setStartIcon(CardService.newIconImage().setIconUrl(t.thumbUrl).setAltText(t.name))
@@ -241,11 +254,18 @@ function goHome(e) {
 
 function categoryChips_(categories, selected, q, admin) {
   var sel = String(selected || '').toLowerCase();
-  var entries = [{ id: 'c:', label: 'All', on: !sel }];
-  categories.forEach(function (c) { entries.push({ id: 'c:' + c.name, label: c.name, on: c.name.toLowerCase() === sel }); });
+  var entries = [];
+  if (!admin && categories.length === 1) {
+    /* Only one category for this person: just that one, already picked. */
+    entries.push({ id: 'c:', label: categories[0].name, on: true });
+  } else {
+    entries.push({ id: 'c:', label: 'All', on: !sel });
+    categories.forEach(function (c) { entries.push({ id: 'c:' + c.name, label: c.name, on: c.name.toLowerCase() === sel }); });
+  }
   if (admin) {
     entries.push({ id: 'c:shared', label: 'Shared', on: sel === 'shared' });
     entries.push({ id: 'c:drafts', label: 'Drafts', on: sel === 'drafts' });
+    entries.push({ id: 'c:hidden', label: 'Hidden', on: sel === 'hidden' });
   }
   try {
     var chips = CardService.newChipList();
@@ -442,7 +462,7 @@ function openEditor(e) {
 function showEditor(e) {
   init_(e);
   try {
-    var t = api_('get', '/api/templates/' + encodeURIComponent(param_(e, 'id') + '?lite=1'));
+    var t = api_('get', '/api/templates/' + encodeURIComponent(param_(e, 'id')) + '?lite=1');
     return CardService.newActionResponseBuilder()
       .setNavigation(CardService.newNavigation().pushCard(buildEditorCard_(t)))
       .build();
@@ -455,8 +475,14 @@ function buildEditorCard_(t) {
   var name = t.name || '';
   var published = t.status === 'published';
   var shared = !published && (t.sharedWith || []).length > 0;
+  var hidden = Boolean(t.hidden);
   var card = CardService.newCardBuilder().setName('editor');
 
+  if (hidden) {
+    card.addSection(CardService.newCardSection().addWidget(withStartIcon_(CardService.newDecoratedText()
+      .setText('<b>Hidden</b> · only admins can see it')
+      .setWrapText(true), 'visibility_off')));
+  }
   card.addSection(backSection_('Back to gallery', 'goHome', {}));
 
   /* Picture, name, status (click the status line to update it after saving in the editor tab). */
@@ -475,6 +501,17 @@ function buildEditorCard_(t) {
     .addButton(withIcon_(button_('Preview', 'previewDraft', params), 'visibility')));
   card.addSection(top);
 
+  /* Hidden: users and the people it is shared with stop seeing it. Admins always see it. */
+  card.addSection(CardService.newCardSection().addWidget(withStartIcon_(CardService.newDecoratedText()
+    .setText('Hidden')
+    .setBottomLabel(hidden ? 'On · switch off to show it again' : 'Off · ' + (published ? 'users who can see ' + esc_(t.category || 'this category') + ' see it' : shared ? 'the people it is shared with can use it' : 'switch on to keep it from users'))
+    .setWrapText(true)
+    .setSwitchControl(CardService.newSwitch()
+      .setFieldName('hiddenSwitch')
+      .setValue('on')
+      .setSelected(hidden)
+      .setOnChangeAction(action_('toggleHidden', params))), 'visibility_off')));
+
   /* Publish for everyone, and share with named people. */
   var pub = CardService.newCardSection();
   pub.addWidget(CardService.newButtonSet()
@@ -484,7 +521,8 @@ function buildEditorCard_(t) {
       .addButton(withIcon_(button_(shared ? 'Shared with ' + t.sharedWith.length + (t.sharedWith.length === 1 ? ' person' : ' people') : 'Share with specific people', 'showShare', params), 'person_add')));
   }
   pub.addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">' + (
-    published ? (t.hasUnpublishedChanges ? 'Publishing updates everyone to v' + ((t.version || 0) + 1) + '.' : 'Live for everyone (v' + (t.version || 1) + ').')
+    hidden ? (shared ? '<font color="' + ORANGE + '">Sharing is paused while hidden. They can\'t open it.</font> ' : '') + 'Publishing keeps it hidden until you switch Hidden off.'
+      : published ? (t.hasUnpublishedChanges ? 'Publishing updates everyone to v' + ((t.version || 0) + 1) + '.' : 'Live for everyone (v' + (t.version || 1) + ').')
       : shared ? (t.sharedStale ? 'You have changes the people it is shared with don\'t have yet. Open Shared to send them the latest.' : 'Only the people it is shared with can use it.')
       : 'Only admins can see it until you publish or share it.') + '</font>'));
   card.addSection(pub);
@@ -499,7 +537,7 @@ function buildEditorCard_(t) {
   }
   more.addWidget(optionRow_('Make a copy', 'content_copy', 'copyTemplate', params));
   more.addWidget(optionRow_('Versions', 'history', 'showVersions', { id: id, name: name }));
-  if (published) more.addWidget(optionRow_('Unpublish (hide from users)', 'visibility_off', 'unpublishTemplate', params));
+  if (published) more.addWidget(optionRow_('Unpublish (back to draft)', 'visibility_off', 'unpublishTemplate', params));
   more.addWidget(optionRow_('<font color="' + RED + '">Delete template</font>', 'delete', 'confirmDelete', { id: id, name: name }, RED));
   card.addSection(more);
 
@@ -509,6 +547,10 @@ function buildEditorCard_(t) {
 /** "● Published · v3" in colour: green live, orange changes not live, blue shared, grey draft. */
 function statusLine_(t, short) {
   var n = (t.sharedWith || []).length;
+  if (t.hidden) {
+    var what = t.status === 'published' ? 'Published · v' + (t.version || 1) : n ? 'Shared' : t.status === 'unpublished' ? 'Unpublished' : 'Draft';
+    return '<font color="' + GREY + '">● ' + what + ' · hidden</font>';
+  }
   if (t.status === 'published') {
     return t.hasUnpublishedChanges
       ? '<font color="' + ORANGE + '">● Published · v' + (t.version || 1) + (short ? ' · not live' : ' · you have changes that aren\'t live yet') + '</font>'
@@ -588,6 +630,17 @@ function publishTemplate(e) {
   }
 }
 
+/** The Hidden switch on the template page: saves straight away. */
+function toggleHidden(e) {
+  init_(e);
+  var id = param_(e, 'id');
+  var on = input_(e, 'hiddenSwitch') === 'on';
+  try {
+    var r = api_('post', '/api/templates/' + encodeURIComponent(id) + '/hidden', { hidden: on });
+    return reloadEditor_(id, on ? 'Hidden. Only admins can see it now.' : 'Shown again. Everyone who could see it before can see it now.', r.template);
+  } catch (err) { return notify_(err.message); }
+}
+
 function unpublishTemplate(e) {
   init_(e);
   try {
@@ -602,7 +655,7 @@ function unpublishTemplate(e) {
 function showShare(e) {
   init_(e);
   try {
-    var t = api_('get', '/api/templates/' + encodeURIComponent(param_(e, 'id') + '?lite=1'));
+    var t = api_('get', '/api/templates/' + encodeURIComponent(param_(e, 'id')) + '?lite=1');
     return CardService.newActionResponseBuilder()
       .setNavigation(CardService.newNavigation().pushCard(buildShareCard_(t)))
       .build();
@@ -774,7 +827,7 @@ function restoreVersion(e) {
 function backToTemplate(e) {
   init_(e);
   try {
-    var t = api_('get', '/api/templates/' + encodeURIComponent(param_(e, 'id') + '?lite=1'));
+    var t = api_('get', '/api/templates/' + encodeURIComponent(param_(e, 'id')) + '?lite=1');
     return CardService.newActionResponseBuilder()
       .setNavigation(CardService.newNavigation().popCard().updateCard(buildEditorCard_(t)))
       .build();
@@ -828,14 +881,14 @@ function showCategories(e) {
   } catch (err) { return notify_(err.message); }
 }
 
-/** One switch flipped: saves only that category, so the others never change. */
+/** Older cards: one switch flipped (kept so an open panel never breaks). */
 function toggleCategory(e) {
   init_(e);
   var name = param_(e, 'name');
   var on = input_(e, param_(e, 'field')) === 'on';
   try {
     api_('post', '/api/categories', { set: { name: name, visible: on } });
-    return categoriesResponse_(name + (on ? ' is now visible to users.' : ' is now hidden from users.'));
+    return categoriesResponse_(name + (on ? ' is now visible to everyone.' : ' is now admins only.'));
   } catch (err) { return categoriesResponse_(err.message); }
 }
 
@@ -845,7 +898,7 @@ function addCategory(e) {
   if (!add) return notify_('Type a name for the new category first.');
   try {
     api_('post', '/api/categories', { add: add });
-    return categoriesResponse_('Added "' + add + '". Users can see it.');
+    return categoriesResponse_('Added "' + add + '". Only admins see it until you choose who can.');
   } catch (err) { return notify_(err.message); }
 }
 
@@ -865,59 +918,119 @@ function buildCategoriesCard_(list) {
   card.addSection(backSection_('Back to gallery', 'goHome', {}));
   card.addSection(CardService.newCardSection()
     .setHeader('CATEGORIES · ' + list.length)
-    .addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">Switch off to hide a category from users. Admins always see it. ✎ Rename or delete opens the category.</font>')));
+    .addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">Each category shows only to the teams and people you choose. Admins always see everything. Open a category to choose who can see it.</font>')));
 
   var section = CardService.newCardSection();
-  list.forEach(function (c, i) {
-    var field = 'cat_' + i;
+  list.forEach(function (c) {
     var count = (c.count || 0) + (c.count === 1 ? ' template' : ' templates');
+    var who = c.audience || (c.visible ? 'Everyone' : 'Admins only');
+    var whoText = who === 'Admins only' ? '<font color="' + ORANGE + '">Admins only (choose who)</font>' : esc_(who);
     section.addWidget(CardService.newDecoratedText()
       .setText(esc_(c.name))
-      .setBottomLabel(count + ' · ' + (c.visible ? 'users see it' : '<font color="' + ORANGE + '">hidden from users</font>'))
+      .setBottomLabel(count + ' · ' + whoText)
       .setWrapText(true)
-      .setSwitchControl(CardService.newSwitch()
-        .setFieldName(field)
-        .setValue('on')
-        .setSelected(Boolean(c.visible))
-        .setOnChangeAction(action_('toggleCategory', { name: c.name, field: field }))));
-    section.addWidget(CardService.newButtonSet()
-      .addButton(withIcon_(button_('Rename or delete', 'showCategory', { name: c.name }, 'borderless'), 'edit')));
+      .setOnClickAction(action_('showCategory', { name: c.name }))
+      .setButton(button_('Open', 'showCategory', { name: c.name }, 'borderless')));
   });
   card.addSection(section);
 
   card.addSection(CardService.newCardSection()
     .setHeader('ADD A CATEGORY')
     .addWidget(CardService.newTextInput().setFieldName('newCategory').setTitle('New category name'))
-    .addWidget(CardService.newButtonSet().addButton(withIcon_(button_('Add', 'addCategory', {}, 'filled'), 'add'))));
+    .addWidget(CardService.newButtonSet().addButton(withIcon_(button_('Add', 'addCategory', {}, 'filled'), 'add')))
+    .addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">New categories start as <b>Admins only</b> until you choose who can see them.</font>')));
   return card.build();
 }
 
-/** One category's own page: rename it, or delete it and choose where its templates go. */
+/** One category's own page: who can see it, rename, delete. */
 function showCategory(e) {
   init_(e);
   try {
-    var list = api_('get', '/api/categories').categories || [];
+    var data = api_('get', '/api/categories');
     var name = param_(e, 'name');
-    var c = list.filter(function (x) { return x.name === name; })[0];
+    var c = (data.categories || []).filter(function (x) { return x.name === name; })[0];
     if (!c) return categoriesResponse_('That category no longer exists.');
     return CardService.newActionResponseBuilder()
-      .setNavigation(CardService.newNavigation().pushCard(buildCategoryCard_(c, list)))
+      .setNavigation(CardService.newNavigation().pushCard(buildCategoryCard_(c, data.categories, data.teams || [])))
       .build();
   } catch (err) { return notify_(err.message); }
 }
 
-function buildCategoryCard_(c, list) {
+function buildCategoryCard_(c, list, teams) {
+  teams = teams || [];
   var count = c.count || 0;
   var card = CardService.newCardBuilder().setName('category');
   card.addSection(backSection_('Back to categories', 'showCategoriesBack', {}));
   card.addSection(CardService.newCardSection()
     .setHeader('CATEGORY')
     .addWidget(CardService.newDecoratedText()
-      .setText(esc_(c.name))
-      .setBottomLabel(count + (count === 1 ? ' template' : ' templates') + ' · ' + (c.visible ? 'users see it' : 'hidden from users')))
+      .setText('<b>' + esc_(c.name) + '</b>')
+      .setBottomLabel(count + (count === 1 ? ' template' : ' templates') + ' · ' + esc_(c.audience || ''))
+      .setWrapText(true)));
+
+  /* Who can see it */
+  var who = CardService.newCardSection().setHeader('WHO CAN SEE IT');
+  var everyone = Boolean(c.visible);
+  who.addWidget(CardService.newSelectionInput()
+    .setType(CardService.SelectionInputType.RADIO_BUTTON)
+    .setFieldName('catMode')
+    .addItem('Everyone at your company', 'everyone', everyone)
+    .addItem('Only these teams and people', 'only', !everyone)
+    .setOnChangeAction(action_('setCategoryMode', { name: c.name })));
+
+  if (!everyone) {
+    var byId = {};
+    teams.forEach(function (t) { byId[t.id] = t; });
+    var chosenTeams = (c.teams || []).filter(function (id) { return byId[id]; });
+    var people = c.people || [];
+    if (!chosenTeams.length && !people.length) {
+      who.addWidget(CardService.newTextParagraph().setText('<font color="' + ORANGE + '">Nobody added yet, so only admins see it.</font>'));
+    }
+    chosenTeams.forEach(function (id) {
+      var t = byId[id];
+      who.addWidget(withStartIcon_(CardService.newDecoratedText()
+        .setText(esc_(t.name) + ' team')
+        .setBottomLabel(t.members.length + (t.members.length === 1 ? ' person' : ' people'))
+        .setWrapText(true)
+        .setButton(button_('Remove', 'catRemoveTeam', { name: c.name, team: id }, 'borderless')), 'group'));
+    });
+    people.forEach(function (email) {
+      who.addWidget(withStartIcon_(CardService.newDecoratedText()
+        .setText(esc_(nameFromEmail_(email)))
+        .setBottomLabel(esc_(email))
+        .setWrapText(true)
+        .setButton(button_('Remove', 'catRemovePerson', { name: c.name, email: email }, 'borderless')), 'person'));
+    });
+
+    var free = teams.filter(function (t) { return chosenTeams.indexOf(t.id) < 0; });
+    if (free.length) {
+      var pick = CardService.newSelectionInput()
+        .setType(CardService.SelectionInputType.DROPDOWN)
+        .setFieldName('catTeam')
+        .setTitle('Add a team');
+      free.forEach(function (t, i) { pick.addItem(t.name + ' team (' + t.members.length + ')', t.id, i === 0); });
+      who.addWidget(pick);
+      who.addWidget(CardService.newButtonSet().addButton(withIcon_(button_('Add team', 'catAddTeam', { name: c.name }), 'group_add')));
+    } else if (!teams.length) {
+      who.addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">No teams yet. Make one with <b>Teams</b> in the gallery, or add people one by one below.</font>'));
+    }
+    who.addWidget(CardService.newTextInput().setFieldName('catPerson').setTitle('Or add one person (email)').setHint('name@your-company.com'));
+    who.addWidget(CardService.newButtonSet().addButton(withIcon_(button_('Add person', 'catAddPerson', { name: c.name }), 'person_add')));
+
+    var seen = [];
+    chosenTeams.forEach(function (id) { seen.push(esc_(byId[id].name) + ' team (' + byId[id].members.length + ')'); });
+    people.forEach(function (email) { seen.push(esc_(nameFromEmail_(email))); });
+    who.addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">Seen by: ' + (seen.length ? seen.join(', ') + ', and admins.' : 'admins only.') + '</font>'));
+  } else {
+    who.addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">Seen by everyone at your company.</font>'));
+  }
+  card.addSection(who);
+
+  card.addSection(CardService.newCardSection()
+    .setHeader('RENAME')
     .addWidget(CardService.newTextInput().setFieldName('catNewName').setTitle('Name').setValue(c.name))
     .addWidget(CardService.newButtonSet().addButton(withIcon_(button_('Save name', 'renameCategory', { name: c.name }, 'filled'), 'check')))
-    .addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">Renaming keeps ' + (count === 1 ? 'its template' : 'all ' + count + ' templates') + ' in it.</font>')));
+    .addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">Renaming keeps ' + (count === 1 ? 'its template' : 'all ' + count + ' templates') + ' and who can see it.</font>')));
 
   var del = CardService.newCardSection();
   del.addWidget(withStartIcon_(CardService.newDecoratedText().setText('<font color="' + RED + '"><b>DELETE CATEGORY</b></font>'), 'delete', RED));
@@ -938,6 +1051,71 @@ function buildCategoryCard_(c, list) {
   }
   card.addSection(del);
   return card.build();
+}
+
+/* ---------- who can see a category: changes ---------- */
+
+/** Saves who can see one category and redraws its page. change(c) edits a copy of the category. */
+function saveAudience_(name, change, message) {
+  var data = api_('get', '/api/categories');
+  var c = (data.categories || []).filter(function (x) { return x.name === name; })[0];
+  if (!c) return categoriesResponse_('That category no longer exists.', true);
+  var next = { name: name, everyone: Boolean(c.visible), teams: (c.teams || []).slice(), people: (c.people || []).slice() };
+  change(next);
+  var out = api_('post', '/api/categories', { audience: next });
+  var fresh = (out.categories || []).filter(function (x) { return x.name === name; })[0];
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().updateCard(buildCategoryCard_(fresh, out.categories, out.teams || [])))
+    .setNotification(CardService.newNotification().setText(message))
+    .build();
+}
+
+function setCategoryMode(e) {
+  init_(e);
+  var name = param_(e, 'name');
+  var everyone = input_(e, 'catMode') === 'everyone';
+  try {
+    return saveAudience_(name, function (a) { a.everyone = everyone; },
+      everyone ? name + ' is now seen by everyone.' : name + ' is now seen only by the teams and people you add.');
+  } catch (err) { return notify_(err.message); }
+}
+
+function catAddTeam(e) {
+  init_(e);
+  var name = param_(e, 'name');
+  var team = input_(e, 'catTeam');
+  if (!team) return notify_('Pick a team first.');
+  try {
+    return saveAudience_(name, function (a) { if (a.teams.indexOf(team) < 0) a.teams.push(team); }, 'Team added. They can see ' + name + ' now.');
+  } catch (err) { return notify_(err.message); }
+}
+
+function catRemoveTeam(e) {
+  init_(e);
+  var name = param_(e, 'name');
+  var team = param_(e, 'team');
+  try {
+    return saveAudience_(name, function (a) { a.teams = a.teams.filter(function (x) { return x !== team; }); }, 'Team removed from ' + name + '.');
+  } catch (err) { return notify_(err.message); }
+}
+
+function catAddPerson(e) {
+  init_(e);
+  var name = param_(e, 'name');
+  var email = String(input_(e, 'catPerson') || '').trim().toLowerCase();
+  if (!email) return notify_('Type an email address first.');
+  try {
+    return saveAudience_(name, function (a) { if (a.people.indexOf(email) < 0) a.people.push(email); }, nameFromEmail_(email) + ' can see ' + name + ' now.');
+  } catch (err) { return notify_(err.message); }
+}
+
+function catRemovePerson(e) {
+  init_(e);
+  var name = param_(e, 'name');
+  var email = param_(e, 'email');
+  try {
+    return saveAudience_(name, function (a) { a.people = a.people.filter(function (x) { return x !== email; }); }, nameFromEmail_(email) + ' removed from ' + name + '.');
+  } catch (err) { return notify_(err.message); }
 }
 
 function showCategoriesBack(e) {
@@ -990,6 +1168,186 @@ function deleteCategory(e) {
     return CardService.newActionResponseBuilder()
       .setNavigation(CardService.newNavigation().popToRoot().pushCard(buildCategoriesCard_(list)))
       .setNotification(CardService.newNotification().setText('Deleted "' + name + '".' + (moveTo ? ' Its templates moved to "' + moveTo + '".' : '')))
+      .build();
+  } catch (err) { return notify_(err.message); }
+}
+
+/* =========================================================
+ * Teams (admins): named lists of people, given categories on each category's page
+ * ========================================================= */
+
+function showTeams(e) {
+  init_(e);
+  try {
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(buildTeamsCard_(api_('get', '/api/teams').teams)))
+      .build();
+  } catch (err) { return notify_(err.message); }
+}
+
+function buildTeamsCard_(teams) {
+  teams = teams || [];
+  var card = CardService.newCardBuilder().setName('teams');
+  card.addSection(backSection_('Back to gallery', 'goHome', {}));
+  card.addSection(CardService.newCardSection()
+    .setHeader('TEAMS · ' + teams.length)
+    .addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">A team is a list of people. Choose which categories each team can see on the category\'s page.</font>')));
+
+  if (teams.length) {
+    var list = CardService.newCardSection();
+    teams.forEach(function (t) {
+      list.addWidget(withStartIcon_(CardService.newDecoratedText()
+        .setText(esc_(t.name) + ' team')
+        .setBottomLabel(t.members.length + (t.members.length === 1 ? ' person' : ' people') + ' · ' + (t.categories && t.categories.length ? 'sees ' + esc_(t.categories.join(', ')) : 'no categories yet'))
+        .setWrapText(true)
+        .setOnClickAction(action_('showTeam', { id: t.id }))
+        .setButton(button_('Open', 'showTeam', { id: t.id }, 'borderless')), 'group'));
+    });
+    card.addSection(list);
+  }
+
+  card.addSection(CardService.newCardSection()
+    .setHeader('NEW TEAM')
+    .addWidget(CardService.newTextInput().setFieldName('teamName').setTitle('Team name').setHint('For example: HR, Delivery, Leaders'))
+    .addWidget(CardService.newButtonSet().addButton(withIcon_(button_('Create', 'createTeam', {}, 'filled'), 'add'))));
+  return card.build();
+}
+
+function findTeam_(teams, id) {
+  return (teams || []).filter(function (t) { return t.id === id; })[0] || null;
+}
+
+function showTeam(e) {
+  init_(e);
+  try {
+    var teams = api_('get', '/api/teams').teams;
+    var t = findTeam_(teams, param_(e, 'id'));
+    if (!t) return notify_('That team no longer exists.');
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(buildTeamCard_(t)))
+      .build();
+  } catch (err) { return notify_(err.message); }
+}
+
+function buildTeamCard_(t) {
+  var params = { id: t.id };
+  var n = t.members.length;
+  var card = CardService.newCardBuilder().setName('team');
+  card.addSection(backSection_('Back to teams', 'showTeamsBack', {}));
+  card.addSection(CardService.newCardSection()
+    .setHeader('TEAM')
+    .addWidget(CardService.newDecoratedText()
+      .setText('<b>' + esc_(t.name) + ' team</b>')
+      .setBottomLabel(n + (n === 1 ? ' person' : ' people') + ' · ' + (t.categories && t.categories.length ? 'sees ' + esc_(t.categories.join(', ')) : 'no categories yet'))
+      .setWrapText(true)));
+
+  var people = CardService.newCardSection().setHeader('PEOPLE · ' + n);
+  if (!n) people.addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">Nobody in this team yet.</font>'));
+  t.members.forEach(function (email) {
+    people.addWidget(withStartIcon_(CardService.newDecoratedText()
+      .setText(esc_(nameFromEmail_(email)))
+      .setBottomLabel(esc_(email))
+      .setWrapText(true)
+      .setButton(button_('Remove', 'removeTeamPerson', { id: t.id, email: email }, 'borderless')), 'person'));
+  });
+  people.addWidget(CardService.newTextInput().setFieldName('teamPeople').setTitle('Add people (emails)').setHint('Separate several with commas'));
+  people.addWidget(CardService.newButtonSet().addButton(withIcon_(button_('Add', 'addTeamPeople', params, 'filled'), 'person_add')));
+  card.addSection(people);
+
+  card.addSection(CardService.newCardSection()
+    .setHeader('RENAME')
+    .addWidget(CardService.newTextInput().setFieldName('teamNewName').setTitle('Team name').setValue(t.name))
+    .addWidget(CardService.newButtonSet().addButton(withIcon_(button_('Save name', 'renameTeam', params), 'check'))));
+
+  card.addSection(CardService.newCardSection()
+    .addWidget(CardService.newButtonSet().addButton(withIcon_(redButton_('Delete team', 'confirmDeleteTeam', { id: t.id, name: t.name }), 'delete')))
+    .addWidget(CardService.newTextParagraph().setText('<font color="' + GREY + '">Asks once more. Its people lose the categories they got through this team.</font>')));
+  return card.build();
+}
+
+/** Saves one team change and redraws the team page (or the list). */
+function teamChange_(body, id, message) {
+  var out = api_('post', '/api/teams', body);
+  var t = findTeam_(out.teams, id || out.created);
+  var card = t ? buildTeamCard_(t) : buildTeamsCard_(out.teams);
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().updateCard(card))
+    .setNotification(CardService.newNotification().setText(message))
+    .build();
+}
+
+function createTeam(e) {
+  init_(e);
+  var name = String(input_(e, 'teamName') || '').trim();
+  if (!name) return notify_('Type a team name first.');
+  try {
+    var out = api_('post', '/api/teams', { create: name });
+    var t = findTeam_(out.teams, out.created);
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().updateCard(buildTeamsCard_(out.teams)).pushCard(buildTeamCard_(t)))
+      .setNotification(CardService.newNotification().setText('Made the ' + name + ' team. Now add its people.'))
+      .build();
+  } catch (err) { return notify_(err.message); }
+}
+
+function addTeamPeople(e) {
+  init_(e);
+  var id = param_(e, 'id');
+  var emails = String(input_(e, 'teamPeople') || '').trim();
+  if (!emails) return notify_('Type an email address first.');
+  try {
+    var n = emails.split(/[\s,;]+/).filter(function (x) { return x; }).length;
+    return teamChange_({ addMembers: { id: id, emails: emails } }, id, n === 1 ? 'Added ' + nameFromEmail_(emails) + '.' : 'Added ' + n + ' people.');
+  } catch (err) { return notify_(err.message); }
+}
+
+function removeTeamPerson(e) {
+  init_(e);
+  var id = param_(e, 'id');
+  var email = param_(e, 'email');
+  try { return teamChange_({ removeMember: { id: id, email: email } }, id, nameFromEmail_(email) + ' removed from the team.'); } catch (err) { return notify_(err.message); }
+}
+
+function renameTeam(e) {
+  init_(e);
+  var id = param_(e, 'id');
+  var name = String(input_(e, 'teamNewName') || '').trim();
+  if (!name) return notify_('Type the new name first.');
+  try { return teamChange_({ rename: { id: id, name: name } }, id, 'Renamed to ' + name + '.'); } catch (err) { return notify_(err.message); }
+}
+
+function confirmDeleteTeam(e) {
+  init_(e);
+  var id = param_(e, 'id');
+  var name = param_(e, 'name');
+  var card = CardService.newCardBuilder().setName('confirmDeleteTeam')
+    .addSection(CardService.newCardSection()
+      .addWidget(withStartIcon_(CardService.newDecoratedText().setText('<font color="' + RED + '"><b>DELETE TEAM</b></font>'), 'delete', RED))
+      .addWidget(CardService.newDecoratedText().setText(esc_(name) + ' team').setWrapText(true))
+      .addWidget(CardService.newTextParagraph().setText('Its people lose the categories they could see through this team. People added to a category by email keep it.'))
+      .addWidget(CardService.newButtonSet()
+        .addButton(button_('Cancel', 'cancelDelete', {}))
+        .addButton(withIcon_(redButton_('Yes, delete', 'deleteTeam', { id: id, name: name }), 'delete'))))
+    .build();
+  return CardService.newActionResponseBuilder().setNavigation(CardService.newNavigation().pushCard(card)).build();
+}
+
+function deleteTeam(e) {
+  init_(e);
+  try {
+    var out = api_('post', '/api/teams', { remove: { id: param_(e, 'id') } });
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().popToRoot().pushCard(buildTeamsCard_(out.teams)))
+      .setNotification(CardService.newNotification().setText('Deleted the ' + param_(e, 'name') + ' team.'))
+      .build();
+  } catch (err) { return notify_(err.message); }
+}
+
+function showTeamsBack(e) {
+  init_(e);
+  try {
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().popCard().updateCard(buildTeamsCard_(api_('get', '/api/teams').teams)))
       .build();
   } catch (err) { return notify_(err.message); }
 }
@@ -1327,6 +1685,13 @@ function errorCard_(err) {
 function firstName_(email) {
   var n = String(email || '').split('@')[0].split(/[._-]/)[0] || String(email || 'someone');
   return n.charAt(0).toUpperCase() + n.slice(1);
+}
+
+/** "Alex Lee" from alex.lee@your-company.com */
+function nameFromEmail_(email) {
+  var parts = String(email || '').split('@')[0].split(/[._-]+/).filter(function (p) { return p; });
+  if (!parts.length) return String(email || '');
+  return parts.map(function (p) { return p.charAt(0).toUpperCase() + p.slice(1); }).join(' ');
 }
 
 function listText_(names) {

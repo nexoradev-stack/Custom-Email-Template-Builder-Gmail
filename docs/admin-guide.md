@@ -1,6 +1,6 @@
 # 🎨 Admin guide
 
-Admins are members of the admin Google Group. In the Gmail panel you'll see **New template**, **Upload image**, **Images**, **Categories** and **View as user**.
+Admins are members of the admin Google Group. In the Gmail panel you'll see **New template**, **Upload image**, **Images**, **Categories**, **Teams** and **View as user**.
 
 ## Make a template
 
@@ -31,8 +31,14 @@ Pick rows from the left (Header, Image, Text, Button, Image + text, Columns, Div
 - **Unpublish** hides a template from users. **Delete** removes it.
 - If another admin saved the same template since you opened it, you'll be warned before overwriting their work.
 
-## Categories
-Switch a category on or off for users (each switch saves straight away), add a category, rename it (its templates follow), or delete it (choose where its templates move).
+## Categories and who sees them
+Open **Categories**, then **Open** on a category. Under **Who can see it** choose **Everyone**, or **Only these teams and people** and add teams or single email addresses. Nobody added means only admins see it, and every new category starts that way. You can also rename a category (its templates and who can see it follow) or delete it (choose where its templates move).
+
+## Teams
+A team is a named list of people. Open **Teams** in the gallery, make a team, and add people by email (several at once, separated by commas). Give a team categories on each category's page. Deleting a team takes it off every category; people added by email keep their access.
+
+## Hidden templates
+Every template page has a **Hidden** switch. When it's on, users and the people a draft is shared with stop seeing the template, and old preview links stop working. Admins still see it everywhere, with a grey "Hidden" line and a **Hidden** filter in the gallery. Switch it off and everything comes back, sharing included. Nothing is deleted.
 
 ## Image library
 Upload pictures once and reuse them. Each picture must be **1 MB or smaller**: a bigger one shows a red message with **Reduce it here**, which opens the built-in image reducer, or a link to Google Squoosh.

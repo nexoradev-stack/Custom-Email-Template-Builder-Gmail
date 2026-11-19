@@ -133,10 +133,21 @@ function expiredPage(kind) {
 </div></body></html>`;
 }
 
+/** A template that was hidden or removed after the link was made. */
+function unavailablePage() {
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Template not available</title></head>
+<body style="font-family:Arial,Helvetica,sans-serif;background:__PAGE__;margin:0;padding:40px 20px;color:#1F1F1F">
+<div style="max-width:480px;margin:0 auto;background:#fff;border:1px solid #DEDDD8;border-radius:16px;padding:24px">
+<h1 style="font-size:20px;margin:0 0 8px">This template isn\u2019t available</h1>
+<p style="margin:0;color:#5F6368;line-height:1.5">It may have been hidden or removed. Ask an admin if you need it.</p>
+</div></body></html>`;
+}
+
 const { applyTheme } = require('./theme');
 
 module.exports = {
   uploadPage: (...args) => applyTheme(uploadPage(...args)),
   expiredPage: (...args) => applyTheme(expiredPage(...args)),
+  unavailablePage: (...args) => applyTheme(unavailablePage(...args)),
   esc
 };
